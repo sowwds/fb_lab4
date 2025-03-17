@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Panel</title>
+    <style>
+        #chat { margin-top: 20px; border-top: 1px solid #ccc; padding: 16px; }
+        .message { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Admin Panel</h1>
+    <!-- Формы для управления товарами (REST API) -->
+    <div id="chat">
+        <h2>Support Chat</h2>
+        <div id="messages"></div>
+        <input type="text" id="messageInput" placeholder="Type your message...">
+        <input type="text" id="recipientId" placeholder="Customer ID">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        // WebSocket чат
+        const ws = new WebSocket('ws://localhost:4000');
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'join', userType: 'admin' }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'message') {
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML += `
+                    <div class="message">
+                        <strong>Customer ${data.from}:</strong> ${data.content}
+                        <button onclick="setRecipient('${data.from}')">Reply</button>
+                    </div>
+                `;
+            }
+        };
+
+        function setRecipient(userId) {
+            document.getElementById('recipientId').value = userId;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const recipientId = document.getElementById('recipientId').value;
+            const content = input.value.trim();
+            if (content && recipientId) {
+                ws.send(JSON.stringify({
+                    type: 'message',
+                    content,
+                    to: recipientId
+                }));
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

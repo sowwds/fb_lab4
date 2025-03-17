@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Online Store</title>
+    <style>
+        .product-card {
+            border: 1px solid #ccc;
+            padding: 16px;
+            margin: 16px;
+            width: 200px;
+            display: inline-block;
+        }
+        .spec-selector {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        #chat {
+            margin-top: 2rem;
+            border-top: 1px solid #ccc;
+            padding: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>Product Catalog</h1>
+
+    <div class="spec-selector">
+        <label>
+            <input type="radio" name="spec" value="basic" checked> Название и цена
+        </label>
+        <label>
+            <input type="radio" name="spec" value="desc"> Название и описание
+        </label>
+        <label>
+            <input type="radio" name="spec" value="full"> Полная информация
+        </label>
+    </div>
+
+    <div id="products"></div>
+
+    <div id="chat">
+        <h2>Чат поддержки</h2>
+        <div id="messages"></div>
+        <input type="text" id="messageInput" placeholder="Введите сообщение...">
+        <button onclick="sendMessage()">Отправить</button>
+    </div>
+
+    <script>
+        // WebSocket соединение
+        const userId = localStorage.getItem('userId') || crypto.randomUUID();
+        localStorage.setItem('userId', userId);
+        const ws = new WebSocket('ws://localhost:4000');
+
+        // GraphQL функция
+        async function fetchGraphQL(query) {
+            const response = await fetch('/graphql', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({query}),
+            });
+            return await response.json();
+        }
+
+        // Спецификации запросов
+        const specifications = {
+            basic: `{ products { name price } }`,
+            desc: `{ products { name description } }`,
+            full: `{ products { id name description price category } }`
+        };
+
+        // Загрузка товаров
+        async function loadProducts(spec = 'basic') {
+            try {
+                const response = await fetchGraphQL(specifications[spec]);
+                displayProducts(response.data.products);
+            } catch (error) {
+                console.error('Ошибка загрузки:', error);
+            }
+        }
+
+        // Отображение товаров
+        function displayProducts(products) {
+            const container = document.getElementById('products');
+            container.innerHTML = products.map(product => `
+                <div class="product-card">
+                    <h3>${product.name}</h3>
+                    ${product.price ? `<p>Цена: $${product.price}</p>` : ''}
+                    ${product.description ? `<p>${product.description}</p>` : ''}
+                    ${product.category ? `<p>Категории: ${product.category.join(', ')}</p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Обработчики событий
+        document.querySelectorAll('input[name="spec"]').forEach(input => {
+            input.addEventListener('change', (e) => {
+                loadProducts(e.target.value);
+            });
+        });
+
+        // Инициализация
+        loadProducts();
+
+        // WebSocket логика
+        ws.onopen = () => {
+            ws.send(JSON.stringify({
+                type: 'join',
+                userType: 'customer',
+                userId
+            }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'message') {
+                document.getElementById('messages').innerHTML += `
+                    <div class="message">
+                        <strong>${data.from === 'admin' ? 'Поддержка' : 'Вы'}:</strong>
+                        ${data.content}
+                    </div>
+                `;
+            }
+        };
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const content = input.value.trim();
+            if (content) {
+                ws.send(JSON.stringify({
+                    type: 'message',
+                    content
+                }));
+                input.value = '';
+            }
+        }
+    </script>
+</body>
+</html>

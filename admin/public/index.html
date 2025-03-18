@@ -10,7 +10,6 @@
 </head>
 <body>
     <h1>Admin Panel</h1>
-    <!-- Формы для управления товарами (REST API) -->
     <div id="chat">
         <h2>Support Chat</h2>
         <div id="messages"></div>
@@ -20,7 +19,6 @@
     </div>
 
     <script>
-        // WebSocket чат
         const ws = new WebSocket('ws://localhost:4000');
         ws.onopen = () => {
             ws.send(JSON.stringify({ type: 'join', userType: 'admin' }));
